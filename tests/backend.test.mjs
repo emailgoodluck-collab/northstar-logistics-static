@@ -121,7 +121,13 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
 
   const trackingResponse = await fetch(`${url}/api/track/eu-2147`);
   assert.equal(trackingResponse.status, 200);
-  assert.equal((await trackingResponse.json()).status, "In transit");
+  const initialTracking = await trackingResponse.json();
+  assert.equal(initialTracking.status, "In transit");
+  assert.ok(Number.isFinite(Date.parse(initialTracking.checkedAt)));
+  assert.ok(Number.isFinite(Date.parse(initialTracking.updated_at)));
+  assert.equal(initialTracking.trackingHistory.length, 1);
+  assert.match(initialTracking.trackingHistory[0].description, /Shipment created/);
+  assert.ok(Number.isFinite(Date.parse(initialTracking.trackingHistory[0].occurred_at)));
 
   const updatedShipment = await adminFetch(`/api/admin/shipments/${shipment.id}`, {
     method: "PATCH",
@@ -129,6 +135,25 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   });
   assert.equal(updatedShipment.status, 200);
   assert.equal((await updatedShipment.json()).status, "Delivered");
+  const updatedTracking = await (await fetch(`${url}/api/track/EU-2147`)).json();
+  assert.equal(updatedTracking.trackingHistory.length, 2);
+  assert.match(updatedTracking.trackingHistory[0].description, /In transit to Delivered/);
+  assert.equal(updatedTracking.trackingHistory[0].status, "Delivered");
+  const unchangedShipment = await adminFetch(`/api/admin/shipments/${shipment.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "Delivered", progress: 100 }),
+  });
+  assert.equal(unchangedShipment.status, 200);
+  const afterUnchangedUpdate = await (await fetch(`${url}/api/track/EU-2147`)).json();
+  assert.equal(afterUnchangedUpdate.trackingHistory.length, 2);
+  const changedEta = await adminFetch(`/api/admin/shipments/${shipment.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ eta: "2026-10-25T12:30:00.000Z" }),
+  });
+  assert.equal(changedEta.status, 200);
+  const afterEtaUpdate = await (await fetch(`${url}/api/track/EU-2147`)).json();
+  assert.equal(afterEtaUpdate.trackingHistory.length, 3);
+  assert.match(afterEtaUpdate.trackingHistory[0].description, /ETA updated/);
 
   const createdDriver = await adminFetch("/api/admin/drivers", {
     method: "POST",
@@ -160,7 +185,7 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   assert.equal(dashboard.allocations[0].region, "Greece");
 
   const events = await (await adminFetch("/api/admin/events")).json();
-  assert.equal(events.length, 4);
+  assert.equal(events.length, 6);
   assert.equal(events[0].admin_email, ADMIN_EMAIL);
 
   const logout = await adminFetch("/api/admin/session", { method: "DELETE" });

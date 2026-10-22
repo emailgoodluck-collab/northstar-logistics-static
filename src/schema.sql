@@ -32,6 +32,18 @@ CREATE TABLE IF NOT EXISTS shipments (
 CREATE INDEX IF NOT EXISTS shipments_status_idx ON shipments (status);
 CREATE INDEX IF NOT EXISTS shipments_eta_idx ON shipments (eta);
 
+CREATE TABLE IF NOT EXISTS shipment_tracking_events (
+  id TEXT PRIMARY KEY,
+  shipment_id TEXT NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('Booked', 'Loading', 'In transit', 'Customs', 'Cleared', 'Delivered', 'Delayed')),
+  progress INTEGER NOT NULL CHECK (progress BETWEEN 0 AND 100),
+  description TEXT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS shipment_tracking_events_shipment_idx
+  ON shipment_tracking_events (shipment_id, occurred_at DESC);
+
 CREATE TABLE IF NOT EXISTS drivers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

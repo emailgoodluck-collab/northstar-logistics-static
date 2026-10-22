@@ -167,6 +167,10 @@
       .tracking input { flex: 1 1 180px; min-height: 41px; padding: 0 12px; border: 1px solid #cbd9e6; border-radius: 10px; background: white; color: var(--ink); font-size: 11px; }
       .track-result { min-height: 17px; margin: 8px 0 0; color: #ffdc7e; font-size: 10px; }
       .track-result.error { color: #ffd5d8; }
+      .tracking-checked { margin: 3px 0 0; color: #c7d7e5; font-size: 9px; }
+      .tracking-history { display: grid; gap: 8px; margin: 10px 0 0; padding: 0 0 0 17px; color: white; font-size: 10px; }
+      .tracking-history li::marker { color: var(--gold); }
+      .tracking-history time { display: block; margin-top: 2px; color: #c7d7e5; font-size: 9px; }
 
       @media (max-width: 850px) {
         .nav-links { gap: 15px; }
@@ -267,6 +271,8 @@
             <button class="button button-gold" type="submit">Track</button>
           </form>
           <p class="track-result" id="tracking-result" role="status" aria-live="polite"></p>
+          <p class="tracking-checked" id="tracking-checked"></p>
+          <ol class="tracking-history" id="tracking-history" aria-label="Shipment tracking history"></ol>
         </aside>
       </section>
 
@@ -340,10 +346,15 @@
       const trackingForm = document.querySelector("#tracking-form");
       const trackingInput = document.querySelector("#tracking-number");
       const trackingResult = document.querySelector("#tracking-result");
+      const trackingChecked = document.querySelector("#tracking-checked");
+      const trackingHistory = document.querySelector("#tracking-history");
       const allocationList = document.querySelector("#allocation-list");
       let liveBackend = false;
       let dashboardLoading = false;
       let dashboardRefreshedAt = 0;
+      let activeTrackingCode = "";
+      let trackingRequest = null;
+      let trackingRefreshedAt = 0;
 
       function formatTime(date, zone) {
         return new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
@@ -452,28 +463,73 @@
         }
       }
 
+      async function refreshTracking(code) {
+        if (trackingRequest) trackingRequest.abort();
+        const request = new AbortController();
+        trackingRequest = request;
+        try {
+          const response = await fetch(`/api/track/${encodeURIComponent(code)}`, {
+            headers: { Accept: "application/json" },
+            signal: request.signal,
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Shipment was not found.");
+          if (activeTrackingCode !== code) return;
+          trackingResult.classList.remove("error");
+          trackingResult.textContent = `${result.tracking_code}: ${result.status} · ${result.origin} → ${result.destination} · ETA ${formatTime(new Date(result.eta), "UTC")} UTC.`;
+          trackingChecked.textContent = `Checked ${new Intl.DateTimeFormat("en-US", {
+            dateStyle: "medium", timeStyle: "medium", timeZoneName: "short",
+          }).format(new Date(result.checkedAt))} · latest shipment update ${new Intl.DateTimeFormat("en-US", {
+            dateStyle: "medium", timeStyle: "medium", timeZoneName: "short",
+          }).format(new Date(result.updated_at))} · refreshes every 30 seconds`;
+          trackingHistory.replaceChildren();
+          for (const event of result.trackingHistory) {
+            const item = document.createElement("li");
+            item.append(document.createTextNode(`${event.status} · ${event.progress}% · ${event.description}`));
+            const time = document.createElement("time");
+            time.dateTime = event.occurred_at;
+            time.textContent = new Intl.DateTimeFormat("en-US", {
+              dateStyle: "medium", timeStyle: "short", timeZoneName: "short",
+            }).format(new Date(event.occurred_at));
+            item.append(time);
+            trackingHistory.append(item);
+          }
+          if (!result.trackingHistory.length) {
+            const empty = document.createElement("li");
+            empty.textContent = "No status history has been recorded for this shipment yet.";
+            trackingHistory.append(empty);
+          }
+        } catch (error) {
+          if (error.name !== "AbortError" && activeTrackingCode === code) {
+            trackingResult.textContent = error.message;
+            trackingResult.classList.add("error");
+          }
+        } finally {
+          if (trackingRequest === request) {
+            trackingRefreshedAt = Date.now();
+            trackingRequest = null;
+          }
+        }
+      }
+
       trackingForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (trackingRequest) trackingRequest.abort();
+        trackingRequest = null;
         const query = trackingInput.value.trim().toUpperCase();
         trackingResult.classList.remove("error");
+        trackingChecked.textContent = "";
+        trackingHistory.replaceChildren();
+        activeTrackingCode = "";
         if (!query) {
           trackingResult.textContent = "Enter a sample shipment ID, such as EU-2147.";
           trackingResult.classList.add("error");
           return;
         }
         if (liveBackend) {
+          activeTrackingCode = query;
           trackingResult.textContent = "Looking up shipment…";
-          try {
-            const response = await fetch(`/api/track/${encodeURIComponent(query)}`, {
-              headers: { Accept: "application/json" },
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || "Shipment was not found.");
-            trackingResult.textContent = `${result.tracking_code}: ${result.status} · ${result.origin} → ${result.destination} · ETA ${formatTime(new Date(result.eta), "UTC")} UTC.`;
-          } catch (error) {
-            trackingResult.textContent = error.message;
-            trackingResult.classList.add("error");
-          }
+          await refreshTracking(query);
           return;
         }
         const match = shipments.find((shipment) => shipment.id === query);
@@ -483,6 +539,7 @@
           return;
         }
         trackingResult.textContent = `${match.id}: ${match.status} · ${match.route} · sample ETA ${formatTime(new Date(Date.now() + match.offset * 60_000), "UTC")} UTC.`;
+        trackingChecked.textContent = "Demo record only. Live database timestamps and scan history are available when connected to the operations backend.";
       });
 
       renderShipments();
@@ -494,6 +551,9 @@
           renderShipments();
         } else if (now - dashboardRefreshedAt >= 15_000) {
           void connectDashboard();
+        }
+        if (liveBackend && activeTrackingCode && !trackingRequest && now - trackingRefreshedAt >= 30_000) {
+          void refreshTracking(activeTrackingCode);
         }
       }, 1000);
     </script>

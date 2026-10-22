@@ -101,6 +101,14 @@ async function recordEvent(pool, adminId, action, entity, entityId = null) {
   );
 }
 
+async function recordShipmentHistory(client, shipmentId, status, progress, description) {
+  await client.query(
+    `INSERT INTO shipment_tracking_events (id, shipment_id, status, progress, description)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [randomUUID(), shipmentId, status, progress, description],
+  );
+}
+
 async function withAudit(pool, adminId, action, entity, entityId, operation) {
   const client = await pool.connect();
   try {
@@ -167,11 +175,24 @@ export async function createApp(pool, options = {}) {
     }
     const trackingCode = String(req.params.trackingCode).toUpperCase();
     const result = await pool.query(
-      "SELECT tracking_code, origin, destination, mode, status, eta, progress FROM shipments WHERE tracking_code = $1",
+      `SELECT id, tracking_code, origin, destination, mode, status, eta, progress, created_at, updated_at
+       FROM shipments WHERE tracking_code = $1`,
       [trackingCode],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Shipment not found." });
-    return res.json(result.rows[0]);
+    const shipment = result.rows[0];
+    const history = await pool.query(
+      `SELECT status, progress, description, occurred_at
+       FROM shipment_tracking_events
+       WHERE shipment_id = $1
+       ORDER BY occurred_at DESC`,
+      [shipment.id],
+    );
+    return res.json({
+      ...shipment,
+      trackingHistory: history.rows,
+      checkedAt: new Date().toISOString(),
+    });
   });
 
   app.get("/admin", (_req, res) => res.sendFile(path.join(rootDir, "admin.html")));
@@ -257,28 +278,75 @@ export async function createApp(pool, options = {}) {
       const columns = ["id", ...config.fields];
       const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
       const values = [id, ...config.fields.map((field) => value[field])];
-      const result = await withAudit(pool, req.admin.id, "created", resource, id, (client) =>
-        client.query(
+      const result = await withAudit(pool, req.admin.id, "created", resource, id, async (client) => {
+        const created = await client.query(
           `INSERT INTO ${config.table} (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`,
           values,
-        ),
-      );
+        );
+        if (resource === "shipments") {
+          await recordShipmentHistory(
+            client,
+            id,
+            created.rows[0].status,
+            created.rows[0].progress,
+            `Shipment created with status ${created.rows[0].status}.`,
+          );
+        }
+        return created;
+      });
       res.status(201).json(result.rows[0]);
     });
 
     adminApi.patch(`/${resource}/:id`, async (req, res) => {
-      const existing = await pool.query(`SELECT ${columns} FROM ${config.table} WHERE id = $1`, [req.params.id]);
-      if (!existing.rowCount) return res.status(404).json({ error: "Record not found." });
-      const merged = { ...Object.fromEntries(config.fields.map((field) => [field, existing.rows[0][field]])), ...req.body };
-      const value = config.validate(merged);
-      const assignments = config.fields.map((field, index) => `${field} = $${index + 2}`).join(", ");
-      const values = [req.params.id, ...config.fields.map((field) => value[field])];
-      const result = await withAudit(pool, req.admin.id, "updated", resource, req.params.id, (client) =>
-        client.query(
+      const result = await withAudit(pool, req.admin.id, "updated", resource, req.params.id, async (client) => {
+        const existingResult = await client.query(
+          `SELECT ${columns} FROM ${config.table} WHERE id = $1 FOR UPDATE`,
+          [req.params.id],
+        );
+        if (!existingResult.rowCount) {
+          const error = new Error("Record not found.");
+          error.status = 404;
+          throw error;
+        }
+        const existing = existingResult.rows[0];
+        const merged = {
+          ...Object.fromEntries(config.fields.map((field) => [field, existing[field]])),
+          ...req.body,
+        };
+        const value = config.validate(merged);
+        const assignments = config.fields.map((field, index) => `${field} = $${index + 2}`).join(", ");
+        const values = [req.params.id, ...config.fields.map((field) => value[field])];
+        const updated = await client.query(
           `UPDATE ${config.table} SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`,
           values,
-        ),
-      );
+        );
+        if (resource === "shipments") {
+          const current = updated.rows[0];
+          const changes = [];
+          if (existing.status !== current.status) {
+            changes.push(`status changed from ${existing.status} to ${current.status}`);
+          }
+          if (existing.progress !== current.progress) {
+            changes.push(`progress updated from ${existing.progress}% to ${current.progress}%`);
+          }
+          if (new Date(existing.eta).getTime() !== new Date(current.eta).getTime()) {
+            changes.push("ETA updated");
+          }
+          for (const field of ["origin", "destination", "mode"]) {
+            if (existing[field] !== current[field]) changes.push(`${field} updated`);
+          }
+          if (changes.length) {
+            await recordShipmentHistory(
+              client,
+              req.params.id,
+              current.status,
+              current.progress,
+              `${changes.join("; ")}.`,
+            );
+          }
+        }
+        return updated;
+      });
       return res.json(result.rows[0]);
     });
 
@@ -308,6 +376,7 @@ export async function createApp(pool, options = {}) {
   app.use((_req, res) => res.status(404).type("text/plain").send("Not found"));
   app.use((error, _req, res, _next) => {
     if (error instanceof ValidationError) return res.status(error.status).json({ error: error.message });
+    if (error.status === 404) return res.status(404).json({ error: error.message });
     if (error?.code === "23505") return res.status(409).json({ error: "A record with this unique value already exists." });
     if (error?.type === "entity.parse.failed") return res.status(400).json({ error: "Request body must contain valid JSON." });
     console.error("NorthStar request failed:", error);
