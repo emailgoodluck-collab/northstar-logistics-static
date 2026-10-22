@@ -217,6 +217,7 @@
           <a href="#operations">Operations</a>
           <a href="#network">Network</a>
           <a href="#contact">Contact</a>
+          <a href="/admin" id="admin-portal-link" hidden>Admin portal</a>
         </nav>
         <div class="actions">
           <a class="button button-outline" href="#operations">Track shipment</a>
@@ -248,8 +249,8 @@
             <span class="live-pill">Demo feed</span>
           </div>
           <div class="metric-row">
-            <div class="metric"><span class="metric-label">Active shipments</span><strong>12,480</strong><small>Sample operational metric</small></div>
-            <div class="metric"><span class="metric-label">Drivers online</span><strong>4,860</strong><small>Sample fleet metric</small></div>
+            <div class="metric"><span class="metric-label">Active shipments</span><strong id="active-shipment-count">12,480</strong><small id="shipment-count-note">Sample operational metric</small></div>
+            <div class="metric"><span class="metric-label">Drivers online</span><strong id="online-driver-count">4,860</strong><small id="driver-count-note">Sample fleet metric</small></div>
           </div>
           <div class="chart-caption"><span>Illustrative dispatch activity</span><span>Past 8 intervals</span></div>
           <div class="chart" aria-label="Illustrative dispatch chart">
@@ -299,7 +300,7 @@
           </section>
           <section class="card" aria-labelledby="allocation-title">
             <div class="section-head"><h3 class="card-title" id="allocation-title">Regional allocation</h3></div>
-            <div class="allocations">
+            <div class="allocations" id="allocation-list">
               <div><div class="alloc-top"><span>Greece</span><span>88% · 42 loads</span></div><div class="alloc-bar"><span style="--util:88%"></span></div><small class="alloc-note">Ports, cold chain, regional delivery</small></div>
               <div><div class="alloc-top"><span>Western Europe</span><span>76% · 168 loads</span></div><div class="alloc-bar"><span style="--util:76%"></span></div><small class="alloc-note">Cross-dock and route balancing</small></div>
               <div><div class="alloc-top"><span>United States</span><span>81% · 244 loads</span></div><div class="alloc-bar"><span style="--util:81%"></span></div><small class="alloc-note">Priority linehaul and regional freight</small></div>
@@ -339,6 +340,10 @@
       const trackingForm = document.querySelector("#tracking-form");
       const trackingInput = document.querySelector("#tracking-number");
       const trackingResult = document.querySelector("#tracking-result");
+      const allocationList = document.querySelector("#allocation-list");
+      let liveBackend = false;
+      let dashboardLoading = false;
+      let dashboardRefreshedAt = 0;
 
       function formatTime(date, zone) {
         return new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
@@ -370,17 +375,105 @@
           }
           rows.append(row);
         }
-        updateTime.textContent = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(new Date(now));
-        athensClock.textContent = `${formatTime(new Date(now), "Europe/Athens")} EET`;
+        renderClocks(now);
       }
 
-      trackingForm.addEventListener("submit", (event) => {
+      function renderClocks(now = Date.now()) {
+        athensClock.textContent = `${formatTime(new Date(now), "Europe/Athens")} EET`;
+        if (!liveBackend) {
+          updateTime.textContent = new Intl.DateTimeFormat("en-US", {
+            hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
+          }).format(new Date(now));
+        }
+      }
+
+      function renderAllocations(allocations) {
+        allocationList.replaceChildren();
+        for (const allocation of allocations) {
+          const wrapper = document.createElement("div");
+          const top = document.createElement("div");
+          top.className = "alloc-top";
+          const region = document.createElement("span");
+          region.textContent = allocation.region;
+          const amount = document.createElement("span");
+          amount.textContent = `${allocation.utilization}% · ${allocation.assigned} loads`;
+          top.append(region, amount);
+          const bar = document.createElement("div");
+          bar.className = "alloc-bar";
+          const fill = document.createElement("span");
+          fill.style.setProperty("--util", `${allocation.utilization}%`);
+          bar.append(fill);
+          const note = document.createElement("small");
+          note.className = "alloc-note";
+          note.textContent = allocation.focus;
+          wrapper.append(top, bar, note);
+          allocationList.append(wrapper);
+        }
+        if (!allocations.length) {
+          const empty = document.createElement("p");
+          empty.className = "alloc-note";
+          empty.textContent = "No regional allocations are recorded yet.";
+          allocationList.append(empty);
+        }
+      }
+
+      async function connectDashboard() {
+        if (dashboardLoading) return;
+        if (location.protocol === "file:" || location.hostname.endsWith(".github.io")) return;
+        dashboardLoading = true;
+        try {
+          const response = await fetch("/api/dashboard", { headers: { Accept: "application/json" } });
+          if (!response.ok) return;
+          const data = await response.json();
+          liveBackend = true;
+          dashboardRefreshedAt = Date.now();
+          document.querySelector("#admin-portal-link").hidden = false;
+          document.querySelector("#active-shipment-count").textContent = data.summary.activeShipments.toLocaleString();
+          document.querySelector("#online-driver-count").textContent = data.summary.driversOnline.toLocaleString();
+          document.querySelector("#shipment-count-note").textContent = `${data.summary.totalShipments.toLocaleString()} records in operations database`;
+          document.querySelector("#driver-count-note").textContent = `${data.summary.totalDrivers.toLocaleString()} driver records`;
+          renderAllocations(data.allocations);
+          const generated = new Date(data.generatedAt);
+          document.querySelector("#updated-at").textContent = new Intl.DateTimeFormat("en-US", {
+            hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
+          }).format(generated);
+          document.querySelector("#operations .section-note").firstChild.textContent = "Live database summary · refreshed ";
+          const sampleRow = document.createElement("tr");
+          const sampleCell = document.createElement("td");
+          sampleCell.colSpan = 5;
+          sampleCell.textContent = "Shipment details are shown only when you enter a valid tracking code above.";
+          sampleRow.append(sampleCell);
+          rows.replaceChildren(sampleRow);
+          document.querySelector(".ops-grid .card .updated").textContent = "Private tracking lookup";
+        } catch (error) {
+          console.info("NorthStar demo mode: backend dashboard is not connected.", error);
+        } finally {
+          dashboardLoading = false;
+        }
+      }
+
+      trackingForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const query = trackingInput.value.trim().toUpperCase();
         trackingResult.classList.remove("error");
         if (!query) {
           trackingResult.textContent = "Enter a sample shipment ID, such as EU-2147.";
           trackingResult.classList.add("error");
+          return;
+        }
+        if (liveBackend) {
+          trackingResult.textContent = "Looking up shipment…";
+          try {
+            const response = await fetch(`/api/track/${encodeURIComponent(query)}`, {
+              headers: { Accept: "application/json" },
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || "Shipment was not found.");
+            trackingResult.textContent = `${result.tracking_code}: ${result.status} · ${result.origin} → ${result.destination} · ETA ${formatTime(new Date(result.eta), "UTC")} UTC.`;
+          } catch (error) {
+            trackingResult.textContent = error.message;
+            trackingResult.classList.add("error");
+          }
           return;
         }
         const match = shipments.find((shipment) => shipment.id === query);
@@ -393,7 +486,16 @@
       });
 
       renderShipments();
-      window.setInterval(renderShipments, 1000);
+      void connectDashboard();
+      window.setInterval(() => {
+        const now = Date.now();
+        renderClocks(now);
+        if (!liveBackend) {
+          renderShipments();
+        } else if (now - dashboardRefreshedAt >= 15_000) {
+          void connectDashboard();
+        }
+      }, 1000);
     </script>
   </body>
 </html>

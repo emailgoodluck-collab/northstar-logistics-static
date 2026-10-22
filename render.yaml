@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: northstar-logistics
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: northstar-logistics-db
+          property: connectionString
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: STATIC_SITE_ORIGIN
+        value: https://emailgoodluck-collab.github.io
+
+databases:
+  - name: northstar-logistics-db
+    databaseName: northstar_logistics
+    user: northstar
+    plan: basic-256mb

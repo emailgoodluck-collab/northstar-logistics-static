@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#102b4e">
+    <title>NorthStar Operations Admin</title>
+    <style>
+      :root { color-scheme: light; --navy:#102b4e; --blue:#174c7e; --gold:#ffbd19; --paper:#f2f6fb; --ink:#183653; --muted:#647b91; --line:#dce6f0; --red:#b73649; font-family:Inter,"Segoe UI",Arial,sans-serif; color:var(--ink); background:var(--paper); }
+      * { box-sizing:border-box; }
+      body { margin:0; min-width:320px; }
+      button,input,select { font:inherit; }
+      button { cursor:pointer; }
+      :focus-visible { outline:3px solid #137caa; outline-offset:2px; }
+      .bar { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:16px max(20px,calc((100% - 1120px)/2)); border-bottom:1px solid var(--line); background:white; }
+      .brand { color:var(--navy); font-size:16px; font-weight:850; text-decoration:none; }
+      .brand small { display:block; color:var(--muted); font-size:9px; letter-spacing:1.4px; text-transform:uppercase; }
+      .bar-actions { display:flex; align-items:center; gap:12px; color:var(--muted); font-size:11px; }
+      .bar a { color:var(--blue); }
+      .button { min-height:38px; padding:0 14px; border:0; border-radius:9px; background:var(--navy); color:white; font-size:11px; font-weight:800; }
+      .button.gold { background:var(--gold); color:var(--navy); }
+      .button.danger { background:#f8e8eb; color:var(--red); }
+      main { width:min(1120px,calc(100% - 32px)); margin:32px auto 70px; }
+      h1 { margin:0; color:var(--navy); font-size:30px; letter-spacing:-1px; }
+      h2 { margin:0; color:var(--navy); font-size:17px; }
+      .intro { margin:7px 0 24px; color:var(--muted); font-size:12px; line-height:1.6; }
+      .panel { margin-top:16px; padding:20px; border:1px solid var(--line); border-radius:16px; background:white; box-shadow:0 9px 24px rgba(18,48,79,.045); }
+      .login-wrap { width:min(430px,100%); margin:8vh auto; }
+      .login-form,.editor-form { display:grid; gap:12px; }
+      label { display:grid; gap:6px; color:#526b83; font-size:10px; font-weight:800; }
+      input,select { width:100%; min-height:39px; padding:8px 10px; border:1px solid #cbd8e5; border-radius:8px; background:white; color:var(--ink); font-size:12px; }
+      .message { min-height:18px; margin:9px 0 0; color:var(--red); font-size:11px; }
+      .notice { padding:11px 13px; border-radius:9px; background:#f1f6fb; color:var(--muted); font-size:10px; line-height:1.5; }
+      .toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+      .toolbar-left { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+      .toolbar select { width:auto; min-width:160px; }
+      .grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(260px,.8fr); align-items:start; gap:16px; }
+      .editor-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
+      .editor-grid .wide { grid-column:1/-1; }
+      .editor-actions { display:flex; gap:9px; align-items:center; }
+      .table-wrap { overflow:auto; margin-top:14px; }
+      table { width:100%; border-collapse:collapse; text-align:left; }
+      th { padding:10px 8px; border-bottom:1px solid var(--line); color:#71869a; font-size:8px; letter-spacing:1px; text-transform:uppercase; white-space:nowrap; }
+      td { padding:10px 8px; border-bottom:1px solid #edf2f7; color:#34516d; font-size:10px; vertical-align:middle; }
+      tbody tr:last-child td { border-bottom:0; }
+      .actions-cell { display:flex; gap:6px; }
+      .small { min-height:29px; padding:0 9px; border:1px solid var(--line); border-radius:7px; background:white; color:var(--blue); font-size:9px; font-weight:800; }
+      .small.delete { color:var(--red); }
+      .events { display:grid; gap:10px; margin-top:14px; }
+      .event { padding-bottom:10px; border-bottom:1px solid #edf2f7; color:#526b83; font-size:10px; line-height:1.5; }
+      .event:last-child { border-bottom:0; }
+      .event time { display:block; margin-top:3px; color:#8496a8; font-size:9px; }
+      .hidden { display:none !important; }
+      @media(max-width:800px) { .grid { grid-template-columns:1fr; } }
+      @media(max-width:540px) { .bar { align-items:flex-start; padding:13px 16px; } .bar-actions { align-items:flex-end; flex-direction:column; gap:7px; } main { margin-top:24px; } .panel { padding:15px; } .editor-grid { grid-template-columns:1fr; } .editor-grid .wide { grid-column:auto; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-left { align-items:stretch; flex-direction:column; } .toolbar select { width:100%; } }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <a class="brand" href="/">NorthStar <small>Operations admin</small></a>
+      <div class="bar-actions">
+        <span id="admin-email"></span>
+        <a href="/">View public site</a>
+        <button class="button hidden" id="logout-button" type="button">Sign out</button>
+      </div>
+    </header>
+    <main>
+      <section id="login-section" class="login-wrap hidden">
+        <div class="panel">
+          <p class="eyebrow">Authorized staff</p>
+          <h1>Admin sign in</h1>
+          <p class="intro">Sign in to manage shipments, drivers, and regional allocations.</p>
+          <form id="login-form" class="login-form">
+            <label>Email address<input id="login-email" name="email" type="email" autocomplete="username" required></label>
+            <label>Password<input name="password" type="password" autocomplete="current-password" minlength="12" required></label>
+            <button class="button gold" type="submit">Sign in</button>
+          </form>
+          <p class="message" id="login-message" role="status" aria-live="polite"></p>
+          <p class="notice">Admin accounts are provisioned by the service owner. There is no public registration form.</p>
+        </div>
+      </section>
+
+      <section id="admin-section" class="hidden">
+        <p class="eyebrow">NorthStar control desk</p>
+        <h1>Operations admin</h1>
+        <p class="intro">Manage shipment records, driver assignments, and regional capacity. Updates are stored in PostgreSQL and recorded in the operations event log.</p>
+        <div class="toolbar panel">
+          <div class="toolbar-left">
+            <label for="resource-select">Manage records</label>
+            <select id="resource-select">
+              <option value="shipments">Shipments</option>
+              <option value="drivers">Drivers</option>
+              <option value="allocations">Regional allocations</option>
+            </select>
+            <span id="record-count" class="intro" style="margin:0"></span>
+          </div>
+          <button class="button" id="new-record" type="button">＋ New record</button>
+        </div>
+        <div class="grid">
+          <section class="panel" aria-labelledby="records-title">
+            <h2 id="records-title">Records</h2>
+            <p class="message" id="records-message" role="status" aria-live="polite"></p>
+            <div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+          </section>
+          <section class="panel hidden" id="editor-panel">
+            <h2 id="editor-title">New record</h2>
+            <p class="message" id="editor-message" role="status" aria-live="polite"></p>
+            <form id="editor-form" class="editor-form"><div class="editor-grid" id="editor-fields"></div><div class="editor-actions"><button class="button gold" type="submit">Save record</button><button class="small" id="cancel-edit" type="button">Cancel</button></div></form>
+          </section>
+          <section class="panel" aria-labelledby="events-title">
+            <h2 id="events-title">Recent admin activity</h2>
+            <div class="events" id="events-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const definitions = {
+        shipments: {
+          title: "Shipments",
+          columns: ["tracking_code", "origin", "destination", "status", "eta"],
+          fields: [
+            { key: "tracking_code", label: "Tracking code", type: "text", placeholder: "EU-2147" },
+            { key: "origin", label: "Origin", type: "text" },
+            { key: "destination", label: "Destination", type: "text" },
+            { key: "mode", label: "Mode", type: "select", options: ["Road freight", "Air priority", "Regional LTL", "Sea freight", "Express"] },
+            { key: "status", label: "Status", type: "select", options: ["Booked", "Loading", "In transit", "Customs", "Cleared", "Delivered", "Delayed"] },
+            { key: "eta", label: "Estimated arrival", type: "datetime-local" },
+            { key: "progress", label: "Progress (%)", type: "number", min: 0, max: 100 },
+          ],
+        },
+        drivers: {
+          title: "Drivers",
+          columns: ["name", "region", "status", "vehicle"],
+          fields: [
+            { key: "name", label: "Name", type: "text" },
+            { key: "region", label: "Region", type: "text" },
+            { key: "status", label: "Status", type: "select", options: ["Available", "On route", "Break", "Off duty"] },
+            { key: "vehicle", label: "Vehicle", type: "text" },
+            { key: "load_description", label: "Current load", type: "text" },
+          ],
+        },
+        allocations: {
+          title: "Regional allocations",
+          columns: ["region", "assigned", "utilization", "focus"],
+          fields: [
+            { key: "region", label: "Region", type: "text" },
+            { key: "assigned", label: "Assigned loads", type: "number", min: 0, max: 1000000 },
+            { key: "utilization", label: "Utilization (%)", type: "number", min: 0, max: 100 },
+            { key: "focus", label: "Regional focus", type: "text" },
+          ],
+        },
+      };
+
+      const loginSection = document.querySelector("#login-section");
+      const adminSection = document.querySelector("#admin-section");
+      const loginMessage = document.querySelector("#login-message");
+      const editorPanel = document.querySelector("#editor-panel");
+      const editorForm = document.querySelector("#editor-form");
+      const editorFields = document.querySelector("#editor-fields");
+      const editorMessage = document.querySelector("#editor-message");
+      const resourceSelect = document.querySelector("#resource-select");
+      const tableHead = document.querySelector("#table-head");
+      const tableBody = document.querySelector("#table-body");
+      const recordsMessage = document.querySelector("#records-message");
+      const eventsList = document.querySelector("#events-list");
+      let currentRecords = [];
+      let editingId = null;
+
+      async function api(url, options = {}) {
+        const response = await fetch(url, {
+          ...options,
+          headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
+          credentials: "same-origin",
+        });
+        if (response.status === 204) return null;
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
+        return body;
+      }
+
+      function showAdmin(admin) {
+        loginSection.classList.add("hidden");
+        adminSection.classList.remove("hidden");
+        document.querySelector("#logout-button").classList.remove("hidden");
+        document.querySelector("#admin-email").textContent = admin.email;
+      }
+
+      function showLogin() {
+        adminSection.classList.add("hidden");
+        loginSection.classList.remove("hidden");
+        document.querySelector("#logout-button").classList.add("hidden");
+        document.querySelector("#login-email").focus();
+      }
+
+      function safeText(value) {
+        if (value == null) return "";
+        if (typeof value === "object") return new Date(value).toLocaleString();
+        return String(value);
+      }
+
+      function toLocalDatetimeValue(value) {
+        const date = new Date(value);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        return date.toISOString().slice(0, 16);
+      }
+
+      function renderTable() {
+        const definition = definitions[resourceSelect.value];
+        tableHead.replaceChildren();
+        tableBody.replaceChildren();
+        const headerRow = document.createElement("tr");
+        for (const column of [...definition.columns, "actions"]) {
+          const th = document.createElement("th");
+          th.textContent = column.replaceAll("_", " ");
+          headerRow.append(th);
+        }
+        tableHead.append(headerRow);
+        for (const record of currentRecords) {
+          const tr = document.createElement("tr");
+          for (const column of definition.columns) {
+            const td = document.createElement("td");
+            td.textContent = safeText(record[column]);
+            tr.append(td);
+          }
+          const actions = document.createElement("td");
+          const actionWrap = document.createElement("div");
+          actionWrap.className = "actions-cell";
+          const edit = document.createElement("button");
+          edit.className = "small";
+          edit.type = "button";
+          edit.textContent = "Edit";
+          edit.addEventListener("click", () => openEditor(record));
+          const remove = document.createElement("button");
+          remove.className = "small delete";
+          remove.type = "button";
+          remove.textContent = "Delete";
+          remove.addEventListener("click", () => void deleteRecord(record.id));
+          actionWrap.append(edit, remove);
+          actions.append(actionWrap);
+          tr.append(actions);
+          tableBody.append(tr);
+        }
+        document.querySelector("#records-title").textContent = definition.title;
+        document.querySelector("#record-count").textContent = `${currentRecords.length} records`;
+      }
+
+      function renderEditor(record = null) {
+        const definition = definitions[resourceSelect.value];
+        editingId = record?.id ?? null;
+        editorFields.replaceChildren();
+        for (const field of definition.fields) {
+          const label = document.createElement("label");
+          label.textContent = field.label;
+          const control = field.type === "select" ? document.createElement("select") : document.createElement("input");
+          control.name = field.key;
+          control.required = true;
+          if (field.type === "select") {
+            for (const optionValue of field.options) {
+              const option = document.createElement("option");
+              option.value = optionValue;
+              option.textContent = optionValue;
+              control.append(option);
+            }
+          } else {
+            control.type = field.type;
+            if (field.placeholder) control.placeholder = field.placeholder;
+            if (field.min !== undefined) control.min = String(field.min);
+            if (field.max !== undefined) control.max = String(field.max);
+            if (field.type === "number") control.step = "1";
+          }
+          const initialValue = record?.[field.key];
+          if (initialValue !== undefined && initialValue !== null) {
+            control.value = field.type === "datetime-local" ? toLocalDatetimeValue(initialValue) : String(initialValue);
+          }
+          label.append(control);
+          if (field.key === "focus" || field.key === "load_description") label.classList.add("wide");
+          editorFields.append(label);
+        }
+        document.querySelector("#editor-title").textContent = record ? `Edit ${definition.title.toLowerCase()}` : `New ${definition.title.toLowerCase()}`;
+        editorMessage.textContent = "";
+        editorPanel.classList.remove("hidden");
+      }
+
+      async function refresh() {
+        recordsMessage.textContent = "";
+        try {
+          currentRecords = await api(`/api/admin/${resourceSelect.value}`);
+          renderTable();
+          const events = await api("/api/admin/events");
+          eventsList.replaceChildren();
+          if (!events.length) {
+            const empty = document.createElement("p");
+            empty.className = "notice";
+            empty.textContent = "No admin changes have been recorded yet.";
+            eventsList.append(empty);
+          }
+          for (const event of events) {
+            const item = document.createElement("div");
+            item.className = "event";
+            item.textContent = `${event.admin_email || "Admin"} ${event.action} ${event.entity}${event.entity_id ? ` · ${event.entity_id}` : ""}`;
+            const time = document.createElement("time");
+            time.textContent = new Date(event.occurred_at).toLocaleString();
+            item.append(time);
+            eventsList.append(item);
+          }
+        } catch (error) {
+          recordsMessage.textContent = error.message;
+          if (error.message.includes("Sign-in") || error.message.includes("Session expired")) showLogin();
+        }
+      }
+
+      async function deleteRecord(id) {
+        if (!window.confirm("Permanently delete this record?")) return;
+        recordsMessage.textContent = "";
+        try {
+          await api(`/api/admin/${resourceSelect.value}/${encodeURIComponent(id)}`, { method: "DELETE" });
+          await refresh();
+        } catch (error) {
+          recordsMessage.textContent = error.message;
+        }
+      }
+
+      function openEditor(record = null) {
+        renderEditor(record);
+        editorPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      document.querySelector("#login-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        loginMessage.textContent = "";
+        const loginForm = event.currentTarget;
+        const formData = new FormData(loginForm);
+        try {
+          const result = await api("/api/admin/session", {
+            method: "POST",
+            body: JSON.stringify({ email: formData.get("email"), password: formData.get("password") }),
+          });
+          loginForm.reset();
+          showAdmin(result.admin);
+          await refresh();
+        } catch (error) {
+          loginMessage.textContent = error.message;
+        }
+      });
+
+      editorForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        editorMessage.textContent = "";
+        const definition = definitions[resourceSelect.value];
+        const data = Object.fromEntries(new FormData(editorForm));
+        for (const field of definition.fields) {
+          if (field.type === "number") data[field.key] = Number(data[field.key]);
+          if (field.type === "datetime-local") data[field.key] = new Date(data[field.key]).toISOString();
+        }
+        try {
+          const url = editingId
+            ? `/api/admin/${resourceSelect.value}/${encodeURIComponent(editingId)}`
+            : `/api/admin/${resourceSelect.value}`;
+          await api(url, { method: editingId ? "PATCH" : "POST", body: JSON.stringify(data) });
+          editorPanel.classList.add("hidden");
+          await refresh();
+        } catch (error) {
+          editorMessage.textContent = error.message;
+        }
+      });
+
+      document.querySelector("#new-record").addEventListener("click", () => openEditor());
+      document.querySelector("#cancel-edit").addEventListener("click", () => editorPanel.classList.add("hidden"));
+      resourceSelect.addEventListener("change", () => {
+        editorPanel.classList.add("hidden");
+        void refresh();
+      });
+      document.querySelector("#logout-button").addEventListener("click", async () => {
+        try { await api("/api/admin/session", { method: "DELETE" }); } finally { showLogin(); }
+      });
+
+      api("/api/admin/session")
+        .then(({ authenticated, admin }) => {
+          if (!authenticated) return showLogin();
+          showAdmin(admin);
+          return refresh();
+        })
+        .catch(() => showLogin());
+    </script>
+  </body>
+</html>
