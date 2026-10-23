@@ -33,6 +33,7 @@ const RESOURCE_CONFIG = {
 const rootDir = fileURLToPath(new URL("../", import.meta.url));
 const loginAttempts = new Map();
 const trackingAttempts = new Map();
+const supportAttempts = new Map();
 
 function cookieValue(req, name) {
   const prefix = `${name}=`;
@@ -80,7 +81,7 @@ function checkLoginLimit(key) {
 
 function setPublicCors(app, allowedOrigin) {
   if (!allowedOrigin) return;
-  for (const route of ["/api/dashboard", "/api/track"]) {
+  for (const route of ["/api/dashboard", "/api/track", "/api/support"]) {
     app.use(route, (req, res, next) => {
       const origin = req.get("Origin");
       if (!origin) return next();
@@ -88,10 +89,30 @@ function setPublicCors(app, allowedOrigin) {
         return res.status(403).json({ error: "Origin is not allowed." });
       }
       res.set("Access-Control-Allow-Origin", allowedOrigin);
+      res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
       res.set("Vary", "Origin");
+      if (req.method === "OPTIONS") return res.status(204).end();
       return next();
     });
   }
+}
+
+function bearerToken(req) {
+  const value = req.get("Authorization") ?? "";
+  const match = /^Bearer ([a-f0-9]{64})$/i.exec(value);
+  return match?.[1] ?? "";
+}
+
+function validateSupportMessage(value) {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > 2000) {
+    throw new ValidationError("Message must contain 1 to 2000 characters.");
+  }
+  return value.trim();
+}
+
+function checkSupportLimit(key) {
+  return checkRateLimit(supportAttempts, key, 20, 5 * 60_000);
 }
 
 async function recordEvent(pool, adminId, action, entity, entityId = null) {
@@ -193,6 +214,95 @@ export async function createApp(pool, options = {}) {
       trackingHistory: history.rows,
       checkedAt: new Date().toISOString(),
     });
+  });
+
+  app.post("/api/support/conversations", async (req, res) => {
+    if (checkRateLimit(supportAttempts, `new:${req.ip}`, 5, 10 * 60_000)) {
+      res.set("Retry-After", "600");
+      return res.status(429).json({ error: "Too many new conversations. Please try again later." });
+    }
+    const message = validateSupportMessage(req.body?.message);
+    const conversationId = randomUUID();
+    const accessToken = createSessionToken();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "INSERT INTO support_conversations (id, access_token_hash) VALUES ($1, $2)",
+        [conversationId, hashToken(accessToken)],
+      );
+      await client.query(
+        `INSERT INTO support_messages (id, conversation_id, sender_kind, body)
+         VALUES ($1, $2, 'customer', $3)`,
+        [randomUUID(), conversationId, message],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+    return res.status(201).json({ conversationId, accessToken });
+  });
+
+  app.get("/api/support/conversations/:id/messages", async (req, res) => {
+    const token = bearerToken(req);
+    if (!token) return res.status(401).json({ error: "A valid conversation token is required." });
+    const conversation = await pool.query(
+      "SELECT id, status FROM support_conversations WHERE id = $1 AND access_token_hash = $2",
+      [req.params.id, hashToken(token)],
+    );
+    if (!conversation.rowCount) return res.status(404).json({ error: "Support conversation not found." });
+    const messages = await pool.query(
+      `SELECT id, sender_kind, body, created_at FROM support_messages
+       WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      [req.params.id],
+    );
+    return res.json({ status: conversation.rows[0].status, messages: messages.rows.reverse() });
+  });
+
+  app.post("/api/support/conversations/:id/messages", async (req, res) => {
+    const token = bearerToken(req);
+    if (!token) return res.status(401).json({ error: "A valid conversation token is required." });
+    const tokenHash = hashToken(token);
+    if (checkSupportLimit(tokenHash)) {
+      res.set("Retry-After", "300");
+      return res.status(429).json({ error: "Too many messages. Please try again later." });
+    }
+    const message = validateSupportMessage(req.body?.message);
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query("BEGIN");
+      const conversation = await client.query(
+        "SELECT id, status FROM support_conversations WHERE id = $1 AND access_token_hash = $2 FOR UPDATE",
+        [req.params.id, tokenHash],
+      );
+      if (!conversation.rowCount) {
+        const error = new Error("Support conversation not found.");
+        error.status = 404;
+        throw error;
+      }
+      if (conversation.rows[0].status !== "open") {
+        const error = new Error("This support conversation is closed.");
+        error.status = 409;
+        throw error;
+      }
+      result = await client.query(
+        `INSERT INTO support_messages (id, conversation_id, sender_kind, body)
+         VALUES ($1, $2, 'customer', $3) RETURNING id, sender_kind, body, created_at`,
+        [randomUUID(), req.params.id, message],
+      );
+      await client.query("UPDATE support_conversations SET updated_at = NOW() WHERE id = $1", [req.params.id]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+    return res.status(201).json(result.rows[0]);
   });
 
   app.get("/admin", (_req, res) => res.sendFile(path.join(rootDir, "admin.html")));
@@ -369,6 +479,67 @@ export async function createApp(pool, options = {}) {
     );
     res.json(result.rows);
   });
+
+  adminApi.get("/support/conversations", async (_req, res) => {
+    const result = await pool.query(
+      `SELECT id, status, created_at, updated_at
+       FROM support_conversations
+       ORDER BY updated_at DESC
+       LIMIT 100`,
+    );
+    const conversations = await Promise.all(result.rows.map(async (conversation) => {
+      const message = await pool.query(
+        `SELECT body FROM support_messages WHERE conversation_id = $1
+         ORDER BY created_at DESC LIMIT 1`,
+        [conversation.id],
+      );
+      return { ...conversation, last_message: message.rows[0]?.body ?? "" };
+    }));
+    res.json(conversations);
+  });
+
+  adminApi.get("/support/conversations/:id/messages", async (req, res) => {
+    const conversation = await pool.query(
+      "SELECT id, status FROM support_conversations WHERE id = $1",
+      [req.params.id],
+    );
+    if (!conversation.rowCount) return res.status(404).json({ error: "Support conversation not found." });
+    const messages = await pool.query(
+      `SELECT id, sender_kind, body, created_at FROM support_messages
+       WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      [req.params.id],
+    );
+    return res.json({ status: conversation.rows[0].status, messages: messages.rows.reverse() });
+  });
+
+  adminApi.post("/support/conversations/:id/messages", async (req, res) => {
+    const message = validateSupportMessage(req.body?.message);
+    const result = await withAudit(pool, req.admin.id, "replied", "support conversation", req.params.id, async (client) => {
+      const conversation = await client.query(
+        "SELECT id, status FROM support_conversations WHERE id = $1 FOR UPDATE",
+        [req.params.id],
+      );
+      if (!conversation.rowCount) {
+        const error = new Error("Support conversation not found.");
+        error.status = 404;
+        throw error;
+      }
+      if (conversation.rows[0].status !== "open") {
+        const error = new Error("This support conversation is closed.");
+        error.status = 409;
+        throw error;
+      }
+      const reply = await client.query(
+        `INSERT INTO support_messages (id, conversation_id, sender_kind, sender_id, body)
+         VALUES ($1, $2, 'admin', $3, $4) RETURNING id, sender_kind, body, created_at`,
+        [randomUUID(), req.params.id, req.admin.id, message],
+      );
+      await client.query("UPDATE support_conversations SET updated_at = NOW() WHERE id = $1", [req.params.id]);
+      return reply;
+    });
+    return res.status(201).json(result.rows[0]);
+  });
+
   app.use("/api/admin", adminApi);
 
   app.use(express.static(rootDir, { index: "index.html", maxAge: "1h" }));
@@ -377,6 +548,7 @@ export async function createApp(pool, options = {}) {
   app.use((error, _req, res, _next) => {
     if (error instanceof ValidationError) return res.status(error.status).json({ error: error.message });
     if (error.status === 404) return res.status(404).json({ error: error.message });
+    if (error.status === 409) return res.status(409).json({ error: error.message });
     if (error?.code === "23505") return res.status(409).json({ error: "A record with this unique value already exists." });
     if (error?.type === "entity.parse.failed") return res.status(400).json({ error: "Request body must contain valid JSON." });
     console.error("NorthStar request failed:", error);

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#102b4e">
     <meta name="description" content="NorthStar Logistics coordinates freight, shipping, and regional operations across Europe and the United States.">
+    <meta name="northstar-api-base" content="">
     <title>NorthStar Logistics | Freight across Europe &amp; the US</title>
     <style>
       :root {
@@ -19,7 +20,6 @@
         --ink: #183653;
         --muted: #647b91;
         --line: #dce6f0;
-        --green: #198553;
         --red: #bd4252;
         --shadow: 0 18px 42px rgba(18, 48, 79, .10);
         font-family: Inter, "Segoe UI", Arial, sans-serif;
@@ -97,18 +97,11 @@
       .metric-label { display: block; color: #b6c8d9; font-size: 10px; font-weight: 650; }
       .metric strong { display: block; margin-top: 5px; color: white; font-size: 27px; letter-spacing: -1.2px; }
       .metric small { display: block; margin-top: 2px; color: #9ee8c6; font-size: 9px; }
-      .chart-caption { display: flex; justify-content: space-between; margin: 20px 0 9px; color: #b6c8d9; font-size: 9px; }
-      .chart { display: flex; align-items: end; gap: 8px; height: 75px; padding: 0 2px; }
-      .chart span { flex: 1; min-width: 5px; height: var(--bar); border-radius: 5px 5px 2px 2px; background: linear-gradient(0deg, #0a9fbd, #45d0c2); opacity: .85; }
       .hub-strip { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 17px; padding: 12px 14px; border-radius: 14px; background: rgba(255,189,25,.13); }
       .hub-strip strong { display: block; color: #ffdc7e; font-size: 12px; }
       .hub-strip small { color: #c7d7e5; font-size: 9px; }
       .hub-time { color: white; font-size: 13px; font-weight: 800; white-space: nowrap; }
 
-      .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-      .stat { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.8); }
-      .stat span { display: block; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-      .stat strong { display: block; margin-top: 5px; color: var(--navy); font-size: 21px; letter-spacing: -.8px; }
       .section { padding-top: 58px; }
       .section-head { align-items: end; margin-bottom: 20px; }
       .section-head .eyebrow { margin-bottom: 7px; }
@@ -133,34 +126,16 @@
       td { padding: 12px 8px; border-bottom: 1px solid #edf2f7; color: #34516d; font-size: 10px; white-space: nowrap; }
       tbody tr:last-child td { border-bottom: 0; }
       td:first-child { color: var(--navy); font-weight: 850; }
-      .status { display: inline-flex; padding: 5px 8px; border-radius: 999px; font-size: 8px; font-weight: 800; }
-      .status.transit { background: #e4f6f4; color: #147a72; }
-      .status.cleared { background: #e4f4eb; color: #157547; }
-      .status.loading { background: #fff4d7; color: #976600; }
-      .status.delayed { background: #fbe9ec; color: var(--red); }
       .allocations { display: grid; gap: 14px; margin-top: 16px; }
       .alloc-top { display: flex; justify-content: space-between; gap: 10px; color: var(--navy); font-size: 10px; font-weight: 800; }
       .alloc-top span:last-child { color: var(--blue-bright); }
       .alloc-bar { overflow: hidden; height: 7px; margin-top: 8px; border-radius: 999px; background: #e8eef5; }
       .alloc-bar span { display: block; width: var(--util); height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0ca7b3, var(--gold)); }
       .alloc-note { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; }
-      .driver-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-      .driver { padding: 16px; border: 1px solid var(--line); border-radius: 17px; background: white; }
-      .driver-top { display: flex; align-items: center; gap: 10px; }
-      .avatar { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #e7eff9; color: var(--navy); font-size: 11px; font-weight: 900; }
-      .driver:nth-child(2) .avatar { background: #fff2d1; }
-      .driver:nth-child(3) .avatar { background: #e4f5f0; }
-      .driver:nth-child(4) .avatar { background: #f8eaf0; }
-      .driver h3 { margin: 0; color: var(--navy); font-size: 11px; }
-      .driver p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
-      .driver-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 11px; border-top: 1px solid #edf2f7; color: var(--muted); font-size: 8px; }
-      .driver-state { color: var(--green); font-weight: 800; }
       .cta { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 58px 0 24px; padding: 27px; border-radius: 22px; background: linear-gradient(115deg, var(--navy), #1b4c78); color: white; }
       .cta .eyebrow { margin-bottom: 7px; color: #a9c7df; }
       .cta h2 { max-width: 600px; margin: 0; font-size: clamp(23px, 3vw, 32px); letter-spacing: -1px; line-height: 1.12; }
       .footer { display: flex; justify-content: space-between; gap: 18px; padding: 17px 0 27px; color: var(--muted); font-size: 9px; }
-      .demo-note { display: inline-flex; align-items: center; gap: 6px; }
-      .demo-note::before { width: 6px; height: 6px; border-radius: 50%; background: var(--gold-deep); content: ""; }
       .sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 
       .tracking { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
@@ -171,13 +146,28 @@
       .tracking-history { display: grid; gap: 8px; margin: 10px 0 0; padding: 0 0 0 17px; color: white; font-size: 10px; }
       .tracking-history li::marker { color: var(--gold); }
       .tracking-history time { display: block; margin-top: 2px; color: #c7d7e5; font-size: 9px; }
+      .chat-launcher { position: fixed; right: 22px; bottom: 22px; z-index: 20; min-height: 48px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--gold); color: var(--navy); box-shadow: 0 10px 30px rgba(16,43,78,.25); font-size: 12px; font-weight: 850; }
+      .chat-panel { position: fixed; right: 22px; bottom: 82px; z-index: 20; display: flex; flex-direction: column; width: min(370px, calc(100vw - 28px)); height: min(520px, calc(100vh - 120px)); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 20px 55px rgba(16,43,78,.24); }
+      .chat-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; background: var(--navy); color: white; }
+      .chat-header strong { display: block; font-size: 13px; }
+      .chat-header small { display: block; margin-top: 4px; color: #c5d8e8; font-size: 10px; }
+      .chat-close { border: 0; background: transparent; color: white; font-size: 22px; }
+      .chat-messages { display: flex; flex: 1; flex-direction: column; gap: 10px; overflow-y: auto; padding: 14px; }
+      .chat-message { max-width: 88%; padding: 10px 12px; border-radius: 12px; background: #edf3f8; color: var(--ink); font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .chat-message.customer { align-self: flex-end; background: #e4f3f5; }
+      .chat-message time { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; }
+      .chat-status { min-height: 18px; margin: 0; padding: 0 14px; color: var(--muted); font-size: 10px; }
+      .chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+      .chat-form input { flex: 1; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid #cbd9e6; border-radius: 9px; color: var(--ink); font-size: 11px; }
+      .chat-form button { padding: 0 13px; border: 0; border-radius: 9px; background: var(--navy); color: white; font-size: 11px; font-weight: 800; }
+      .chat-config { padding: 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+      .chat-panel[hidden] { display: none; }
 
       @media (max-width: 850px) {
         .nav-links { gap: 15px; }
         .hero { grid-template-columns: 1fr; gap: 25px; padding-top: 42px; }
         .hero-copy { max-width: 690px; }
         .dashboard { max-width: 680px; }
-        .driver-grid { grid-template-columns: repeat(2, 1fr); }
       }
       @media (max-width: 620px) {
         .wrap { width: min(100% - 28px, 1160px); }
@@ -191,16 +181,10 @@
         .hero-copy { font-size: 13px; }
         .hero-proof { gap: 10px 15px; font-size: 9px; }
         .dashboard { padding: 17px; border-radius: 19px; }
-        .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .stat { padding: 13px; }
-        .stat strong { font-size: 18px; }
         .section { padding-top: 43px; }
         .section-head { align-items: start; flex-direction: column; gap: 8px; }
         .service-grid, .ops-grid { grid-template-columns: 1fr; }
         .service { padding: 17px; }
-        .driver-grid { gap: 8px; }
-        .driver { padding: 12px; }
-        .driver-meta { flex-direction: column; gap: 5px; }
         .cta { align-items: flex-start; flex-direction: column; margin-top: 42px; padding: 21px; }
         .footer { flex-direction: column; gap: 7px; }
       }
@@ -241,46 +225,34 @@
             <a class="button button-outline" href="#network">Explore the network</a>
           </div>
           <ul class="hero-proof">
-            <li>18 strategic hubs</li>
-            <li>8 operating regions</li>
-            <li>24/7 control-tower concept</li>
+            <li>Freight coordination</li>
+            <li>Europe and United States</li>
+            <li>Regional operations in Greece</li>
           </ul>
-        </div>
+          </div>
 
-        <aside class="dashboard" aria-label="Demonstration operations dashboard">
-          <div class="dash-head">
-            <div><span class="dash-label">NorthStar network</span><h2 class="dash-title">Operations pulse</h2></div>
-            <span class="live-pill">Demo feed</span>
-          </div>
-          <div class="metric-row">
-            <div class="metric"><span class="metric-label">Active shipments</span><strong id="active-shipment-count">12,480</strong><small id="shipment-count-note">Sample operational metric</small></div>
-            <div class="metric"><span class="metric-label">Drivers online</span><strong id="online-driver-count">4,860</strong><small id="driver-count-note">Sample fleet metric</small></div>
-          </div>
-          <div class="chart-caption"><span>Illustrative dispatch activity</span><span>Past 8 intervals</span></div>
-          <div class="chart" aria-label="Illustrative dispatch chart">
-            <span style="--bar:32%"></span><span style="--bar:48%"></span><span style="--bar:38%"></span><span style="--bar:65%"></span>
-            <span style="--bar:55%"></span><span style="--bar:82%"></span><span style="--bar:71%"></span><span style="--bar:94%"></span>
-          </div>
-          <div class="hub-strip">
-            <div><strong>Athens · Greece control hub</strong><small>Regional allocation and coordination</small></div>
+          <aside class="dashboard" aria-label="Live operations dashboard">
+            <div class="dash-head">
+              <div><span class="dash-label">NorthStar network</span><h2 class="dash-title">Operations pulse</h2></div>
+              <span class="live-pill" id="backend-status">Connecting</span>
+            </div>
+            <div class="metric-row">
+              <div class="metric"><span class="metric-label">Active shipments</span><strong id="active-shipment-count">—</strong><small id="shipment-count-note">Waiting for operations service</small></div>
+              <div class="metric"><span class="metric-label">Drivers online</span><strong id="online-driver-count">—</strong><small id="driver-count-note">Waiting for operations service</small></div>
+            </div>
+            <div class="hub-strip">
+              <div><strong>Greece · Regional operations</strong><small>Freight coordination</small></div>
             <time class="hub-time" id="athens-clock">--:--</time>
           </div>
           <form class="tracking" id="tracking-form">
-            <label class="sr-only" for="tracking-number">Enter sample shipment ID</label>
-            <input id="tracking-number" name="tracking" placeholder="Try sample ID: EU-2147" autocomplete="off">
+            <label class="sr-only" for="tracking-number">Enter tracking code</label>
+            <input id="tracking-number" name="tracking" placeholder="Enter your tracking code" autocomplete="off" required>
             <button class="button button-gold" type="submit">Track</button>
           </form>
           <p class="track-result" id="tracking-result" role="status" aria-live="polite"></p>
           <p class="tracking-checked" id="tracking-checked"></p>
           <ol class="tracking-history" id="tracking-history" aria-label="Shipment tracking history"></ol>
         </aside>
-      </section>
-
-      <section class="stats" aria-label="Illustrative service metrics">
-        <article class="stat"><span>On-time target</span><strong>99.4%</strong></article>
-        <article class="stat"><span>Regional coverage</span><strong>8 regions</strong></article>
-        <article class="stat"><span>Dispatch response</span><strong>&lt; 15 min</strong></article>
-        <article class="stat"><span>Fleet capacity</span><strong>1,240 units</strong></article>
       </section>
 
       <section class="section" id="services">
@@ -293,10 +265,10 @@
       </section>
 
       <section class="section" id="operations">
-        <div class="section-head"><div><p class="eyebrow">Operations desk</p><h2 class="section-title">A connected view of the network.</h2></div><p class="section-note">Sample records · refreshed <time id="updated-at">--</time></p></div>
+        <div class="section-head"><div><p class="eyebrow">Operations desk</p><h2 class="section-title">A connected view of the network.</h2></div><p class="section-note"><span id="operations-status">Live data unavailable until the operations service is connected.</span> <time id="updated-at"></time></p></div>
         <div class="ops-grid">
           <section class="card" aria-labelledby="shipments-title">
-            <div class="section-head"><h3 class="card-title" id="shipments-title">Shipment watchlist</h3><span class="updated">Illustrative data</span></div>
+            <div class="section-head"><h3 class="card-title" id="shipments-title">Shipment watchlist</h3><span class="updated" id="shipment-list-status">No live data</span></div>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Shipment</th><th>Route</th><th>Mode</th><th>Status</th><th>ETA</th></tr></thead>
@@ -306,42 +278,32 @@
           </section>
           <section class="card" aria-labelledby="allocation-title">
             <div class="section-head"><h3 class="card-title" id="allocation-title">Regional allocation</h3></div>
-            <div class="allocations" id="allocation-list">
-              <div><div class="alloc-top"><span>Greece</span><span>88% · 42 loads</span></div><div class="alloc-bar"><span style="--util:88%"></span></div><small class="alloc-note">Ports, cold chain, regional delivery</small></div>
-              <div><div class="alloc-top"><span>Western Europe</span><span>76% · 168 loads</span></div><div class="alloc-bar"><span style="--util:76%"></span></div><small class="alloc-note">Cross-dock and route balancing</small></div>
-              <div><div class="alloc-top"><span>United States</span><span>81% · 244 loads</span></div><div class="alloc-bar"><span style="--util:81%"></span></div><small class="alloc-note">Priority linehaul and regional freight</small></div>
-            </div>
+            <div class="allocations" id="allocation-list"><p class="alloc-note">Live allocations will appear when available.</p></div>
           </section>
         </div>
       </section>
 
       <section class="section" id="network">
-        <div class="section-head"><div><p class="eyebrow">Driver network</p><h2 class="section-title">People powering every lane.</h2></div><p class="section-note">Fictional sample roster for this standalone demo.</p></div>
-        <div class="driver-grid">
-          <article class="driver"><div class="driver-top"><span class="avatar">MD</span><div><h3>Mila Dimas</h3><p>Athens, Greece</p></div></div><div class="driver-meta"><span>Euro 6 truck · 3 pallets</span><span class="driver-state">Available</span></div></article>
-          <article class="driver"><div class="driver-top"><span class="avatar">LK</span><div><h3>Leo Kosta</h3><p>Rotterdam, NL</p></div></div><div class="driver-meta"><span>Container van · 12 pallets</span><span class="driver-state">On route</span></div></article>
-          <article class="driver"><div class="driver-top"><span class="avatar">NV</span><div><h3>Nora Voss</h3><p>Chicago, US</p></div></div><div class="driver-meta"><span>Linehaul · Full trailer</span><span class="driver-state">Available</span></div></article>
-          <article class="driver"><div class="driver-top"><span class="avatar">OE</span><div><h3>Omar Elian</h3><p>Milan, Italy</p></div></div><div class="driver-meta"><span>Express van · 2 pallets</span><span class="driver-state">On break</span></div></article>
-        </div>
+        <div class="section-head"><div><p class="eyebrow">Driver network</p><h2 class="section-title">People powering every lane.</h2></div><p class="section-note">Driver details are managed securely by operations.</p></div>
+        <p class="section-note">Personal driver and assignment information is not displayed on the public site.</p>
       </section>
 
       <section class="cta" id="contact">
         <div><p class="eyebrow">NorthStar Logistics</p><h2>Make your next shipment easier to coordinate.</h2></div>
         <a class="button button-gold" href="#home">Back to top ↑</a>
       </section>
-      <footer class="footer"><span>NorthStar Logistics · Freight across Europe &amp; the United States</span><span class="demo-note">Standalone concept page · Operations figures are examples, not live carrier data.</span></footer>
+      <footer class="footer"><span>NorthStar Logistics · Freight across Europe &amp; the United States</span><span id="site-status">Live operational data requires a connected operations service.</span></footer>
     </main>
 
+    <button class="chat-launcher" id="chat-launcher" type="button" aria-expanded="false" aria-controls="support-chat">Live support</button>
+    <section class="chat-panel" id="support-chat" aria-label="Live support chat" hidden>
+      <header class="chat-header"><div><strong>NorthStar support</strong><small id="chat-availability">Checking support availability…</small></div><button class="chat-close" id="chat-close" type="button" aria-label="Close support chat">×</button></header>
+      <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+      <p class="chat-status" id="chat-status" role="status" aria-live="polite"></p>
+      <form class="chat-form" id="chat-form"><label class="sr-only" for="chat-input">Message support</label><input id="chat-input" maxlength="2000" placeholder="Write a message…" autocomplete="off" required><button type="submit">Send</button></form>
+    </section>
     <script>
-      const shipments = [
-        { id: "EU-2147", route: "Athens → Rotterdam", mode: "Road freight", status: "In transit", offset: 150, progress: 74 },
-        { id: "US-5401", route: "Chicago → Newark", mode: "Air priority", status: "Cleared", offset: 240, progress: 63 },
-        { id: "GR-1189", route: "Piraeus → Thessaloniki", mode: "Regional LTL", status: "Loading", offset: 60, progress: 41 },
-        { id: "FR-8840", route: "Paris → Madrid", mode: "Express", status: "Delayed", offset: 360, progress: 52 },
-      ];
-      const statusKinds = { "In transit": "transit", Cleared: "cleared", Loading: "loading", Delayed: "delayed" };
       const rows = document.querySelector("#shipment-rows");
-      const updateTime = document.querySelector("#updated-at");
       const athensClock = document.querySelector("#athens-clock");
       const trackingForm = document.querySelector("#tracking-form");
       const trackingInput = document.querySelector("#tracking-number");
@@ -349,53 +311,30 @@
       const trackingChecked = document.querySelector("#tracking-checked");
       const trackingHistory = document.querySelector("#tracking-history");
       const allocationList = document.querySelector("#allocation-list");
+      const chatPanel = document.querySelector("#support-chat");
+      const chatMessages = document.querySelector("#chat-messages");
+      const chatStatus = document.querySelector("#chat-status");
+      const chatInput = document.querySelector("#chat-input");
+      const chatForm = document.querySelector("#chat-form");
+      const supportTokenKey = "northstar_support_token";
+      const supportConversationKey = "northstar_support_conversation";
+      const apiBase = document.querySelector('meta[name="northstar-api-base"]').content.trim().replace(/\/$/, "");
+      const apiAvailable = location.protocol !== "file:" && Boolean(apiBase || !location.hostname.endsWith(".github.io"));
+      const apiUrl = (path) => `${apiBase}${path}`;
       let liveBackend = false;
       let dashboardLoading = false;
       let dashboardRefreshedAt = 0;
       let activeTrackingCode = "";
       let trackingRequest = null;
       let trackingRefreshedAt = 0;
+      let supportLoading = false;
 
       function formatTime(date, zone) {
         return new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
       }
 
-      function renderShipments() {
-        const now = Date.now();
-        rows.replaceChildren();
-        for (const shipment of shipments) {
-          const row = document.createElement("tr");
-          const values = [
-            shipment.id,
-            shipment.route,
-            shipment.mode,
-            null,
-            formatTime(new Date(now + shipment.offset * 60_000), "UTC") + " UTC",
-          ];
-          for (const [index, value] of values.entries()) {
-            const cell = document.createElement("td");
-            if (index === 3) {
-              const badge = document.createElement("span");
-              badge.className = `status ${statusKinds[shipment.status]}`;
-              badge.textContent = shipment.status;
-              cell.append(badge);
-            } else {
-              cell.textContent = value;
-            }
-            row.append(cell);
-          }
-          rows.append(row);
-        }
-        renderClocks(now);
-      }
-
-      function renderClocks(now = Date.now()) {
-        athensClock.textContent = `${formatTime(new Date(now), "Europe/Athens")} EET`;
-        if (!liveBackend) {
-          updateTime.textContent = new Intl.DateTimeFormat("en-US", {
-            hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
-          }).format(new Date(now));
-        }
+      function renderClocks() {
+        athensClock.textContent = `${formatTime(new Date(), "Europe/Athens")} Athens`;
       }
 
       function renderAllocations(allocations) {
@@ -428,36 +367,63 @@
         }
       }
 
+      function renderShipmentsEmpty(message) {
+        rows.replaceChildren();
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.textContent = message;
+        row.append(cell);
+        rows.append(row);
+      }
+
       async function connectDashboard() {
         if (dashboardLoading) return;
-        if (location.protocol === "file:" || location.hostname.endsWith(".github.io")) return;
+        if (!apiAvailable) {
+          dashboardRefreshedAt = Date.now();
+          document.querySelector("#backend-status").textContent = "Unavailable";
+          document.querySelector("#operations-status").textContent = "Live operational data is unavailable.";
+          document.querySelector("#site-status").textContent = "Operations service is not connected.";
+          document.querySelector("#shipment-count-note").textContent = "No live operations connection";
+          document.querySelector("#driver-count-note").textContent = "No live operations connection";
+          document.querySelector("#shipment-list-status").textContent = "Unavailable";
+          renderShipmentsEmpty("Live shipment data is unavailable. Connect the operations service to continue.");
+          return;
+        }
         dashboardLoading = true;
         try {
-          const response = await fetch("/api/dashboard", { headers: { Accept: "application/json" } });
-          if (!response.ok) return;
+          const response = await fetch(apiUrl("/api/dashboard"), { headers: { Accept: "application/json" } });
+          if (!response.ok) throw new Error(`Operations service returned ${response.status}.`);
           const data = await response.json();
           liveBackend = true;
           dashboardRefreshedAt = Date.now();
-          document.querySelector("#admin-portal-link").hidden = false;
+          const adminLink = document.querySelector("#admin-portal-link");
+          adminLink.href = apiUrl("/admin");
+          adminLink.hidden = false;
+          document.querySelector("#backend-status").textContent = "Live";
           document.querySelector("#active-shipment-count").textContent = data.summary.activeShipments.toLocaleString();
           document.querySelector("#online-driver-count").textContent = data.summary.driversOnline.toLocaleString();
-          document.querySelector("#shipment-count-note").textContent = `${data.summary.totalShipments.toLocaleString()} records in operations database`;
-          document.querySelector("#driver-count-note").textContent = `${data.summary.totalDrivers.toLocaleString()} driver records`;
+          document.querySelector("#shipment-count-note").textContent = `${data.summary.totalShipments.toLocaleString()} live records`;
+          document.querySelector("#driver-count-note").textContent = `${data.summary.totalDrivers.toLocaleString()} managed records`;
           renderAllocations(data.allocations);
           const generated = new Date(data.generatedAt);
           document.querySelector("#updated-at").textContent = new Intl.DateTimeFormat("en-US", {
             hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
           }).format(generated);
-          document.querySelector("#operations .section-note").firstChild.textContent = "Live database summary · refreshed ";
-          const sampleRow = document.createElement("tr");
-          const sampleCell = document.createElement("td");
-          sampleCell.colSpan = 5;
-          sampleCell.textContent = "Shipment details are shown only when you enter a valid tracking code above.";
-          sampleRow.append(sampleCell);
-          rows.replaceChildren(sampleRow);
-          document.querySelector(".ops-grid .card .updated").textContent = "Private tracking lookup";
-        } catch (error) {
-          console.info("NorthStar demo mode: backend dashboard is not connected.", error);
+          document.querySelector("#operations-status").textContent = "Database summary refreshed";
+          document.querySelector("#shipment-list-status").textContent = "Private tracking lookup";
+          renderShipmentsEmpty("Enter a tracking code above to view its current status and history.");
+        } catch {
+          dashboardRefreshedAt = Date.now();
+          if (!liveBackend) {
+            document.querySelector("#backend-status").textContent = "Unavailable";
+            document.querySelector("#operations-status").textContent = "Live operational data is unavailable.";
+            document.querySelector("#site-status").textContent = "Operations service is not connected.";
+            document.querySelector("#shipment-count-note").textContent = "No live operations connection";
+            document.querySelector("#driver-count-note").textContent = "No live operations connection";
+            document.querySelector("#shipment-list-status").textContent = "Unavailable";
+            renderShipmentsEmpty("Live shipment data is unavailable. Connect the operations service to continue.");
+          }
         } finally {
           dashboardLoading = false;
         }
@@ -468,7 +434,7 @@
         const request = new AbortController();
         trackingRequest = request;
         try {
-          const response = await fetch(`/api/track/${encodeURIComponent(code)}`, {
+          const response = await fetch(apiUrl(`/api/track/${encodeURIComponent(code)}`), {
             headers: { Accept: "application/json" },
             signal: request.signal,
           });
@@ -522,40 +488,132 @@
         trackingHistory.replaceChildren();
         activeTrackingCode = "";
         if (!query) {
-          trackingResult.textContent = "Enter a sample shipment ID, such as EU-2147.";
+          trackingResult.textContent = "Enter a tracking code.";
           trackingResult.classList.add("error");
           return;
         }
-        if (liveBackend) {
+        if (apiAvailable) {
           activeTrackingCode = query;
           trackingResult.textContent = "Looking up shipment…";
           await refreshTracking(query);
           return;
         }
-        const match = shipments.find((shipment) => shipment.id === query);
-        if (!match) {
-          trackingResult.textContent = "No sample shipment found. Try EU-2147, US-5401, GR-1189, or FR-8840.";
-          trackingResult.classList.add("error");
-          return;
-        }
-        trackingResult.textContent = `${match.id}: ${match.status} · ${match.route} · sample ETA ${formatTime(new Date(Date.now() + match.offset * 60_000), "UTC")} UTC.`;
-        trackingChecked.textContent = "Demo record only. Live database timestamps and scan history are available when connected to the operations backend.";
+        trackingResult.textContent = "Shipment tracking is unavailable until the operations service is connected.";
+        trackingResult.classList.add("error");
       });
 
-      renderShipments();
+      function renderSupportMessages(messages) {
+        chatMessages.replaceChildren();
+        for (const message of messages) {
+          const item = document.createElement("article");
+          item.className = `chat-message ${message.sender_kind === "customer" ? "customer" : ""}`;
+          item.append(document.createTextNode(message.body));
+          const time = document.createElement("time");
+          time.dateTime = message.created_at;
+          time.textContent = new Intl.DateTimeFormat("en-US", {
+            dateStyle: "short", timeStyle: "short", timeZoneName: "short",
+          }).format(new Date(message.created_at));
+          item.append(time);
+          chatMessages.append(item);
+        }
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      async function refreshSupport() {
+        if (supportLoading || !apiAvailable || !chatPanel || chatPanel.hidden) return;
+        supportLoading = true;
+        try {
+          const token = sessionStorage.getItem(supportTokenKey);
+          if (token) {
+            const conversationId = sessionStorage.getItem(supportConversationKey);
+            const response = await fetch(apiUrl(`/api/support/conversations/${encodeURIComponent(conversationId)}/messages`), {
+              headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+            });
+            const data = await response.json();
+            if (response.status === 401 || response.status === 404) {
+              sessionStorage.removeItem(supportTokenKey);
+              sessionStorage.removeItem(supportConversationKey);
+              renderSupportMessages([]);
+              chatStatus.textContent = "Your previous chat session expired. Send a message to start a new conversation.";
+            } else if (!response.ok) {
+              throw new Error(data.error || "Could not load support messages.");
+            } else {
+              renderSupportMessages(data.messages);
+              chatStatus.textContent = data.status === "closed" ? "This conversation is closed." : "";
+            }
+          }
+          document.querySelector("#chat-availability").textContent = "Operations inbox · replies appear when staff respond";
+        } catch (error) {
+          document.querySelector("#chat-availability").textContent = "Support service unavailable";
+          chatStatus.textContent = error.message;
+        } finally {
+          supportLoading = false;
+        }
+      }
+
+      document.querySelector("#chat-launcher").addEventListener("click", (event) => {
+        chatPanel.hidden = !chatPanel.hidden;
+        event.currentTarget.setAttribute("aria-expanded", String(!chatPanel.hidden));
+        if (!chatPanel.hidden) {
+          if (!apiAvailable) {
+            document.querySelector("#chat-availability").textContent = "Support service is not connected";
+            chatStatus.textContent = "Live chat is unavailable until the database-backed operations service is deployed.";
+          }
+          chatInput.focus();
+          void refreshSupport();
+        }
+      });
+      document.querySelector("#chat-close").addEventListener("click", () => {
+        chatPanel.hidden = true;
+        document.querySelector("#chat-launcher").setAttribute("aria-expanded", "false");
+      });
+      chatForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const message = chatInput.value.trim();
+        if (!message) return;
+        const button = chatForm.querySelector("button");
+        button.disabled = true;
+        chatStatus.textContent = "";
+        try {
+          const token = sessionStorage.getItem(supportTokenKey);
+          const conversationId = sessionStorage.getItem(supportConversationKey);
+          const response = await fetch(apiUrl(token
+            ? `/api/support/conversations/${encodeURIComponent(conversationId)}/messages`
+            : "/api/support/conversations"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ message }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Message could not be sent.");
+          if (result.accessToken) {
+            sessionStorage.setItem(supportTokenKey, result.accessToken);
+            sessionStorage.setItem(supportConversationKey, result.conversationId);
+          }
+          chatInput.value = "";
+          await refreshSupport();
+        } catch (error) {
+          chatStatus.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
+
       void connectDashboard();
       window.setInterval(() => {
-        const now = Date.now();
-        renderClocks(now);
-        if (!liveBackend) {
-          renderShipments();
-        } else if (now - dashboardRefreshedAt >= 15_000) {
+        renderClocks();
+        if (Date.now() - dashboardRefreshedAt >= 15_000) {
           void connectDashboard();
         }
-        if (liveBackend && activeTrackingCode && !trackingRequest && now - trackingRefreshedAt >= 30_000) {
+        if (liveBackend && activeTrackingCode && !trackingRequest && Date.now() - trackingRefreshedAt >= 30_000) {
           void refreshTracking(activeTrackingCode);
         }
-      }, 1000);
+        void refreshSupport();
+      }, 5000);
+      renderClocks();
     </script>
   </body>
 </html>

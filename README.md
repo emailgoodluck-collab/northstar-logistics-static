@@ -4,9 +4,9 @@ NorthStar is a standalone logistics website with an Express API, PostgreSQL
 database, and password-protected operations admin portal. The project is
 separate from the unrelated `fantasy-api` Render service.
 
-The public GitHub Pages site remains a static demo. The database-backed
-website and admin portal are served together by the Node.js app after it is
-deployed.
+The public website contains no fabricated shipment, driver, allocation, or
+performance records. Live operational data and support conversations require
+the Node.js app and PostgreSQL database to be deployed.
 
 ## Local development
 
@@ -26,8 +26,15 @@ npm start
 The website is at <http://localhost:3000>, the sign-in page at
 <http://localhost:3000/admin>, and the database readiness endpoint at
 <http://localhost:3000/health/ready>. The first startup applies the idempotent
-schema and creates the initial admin account. No sample operational rows are
+schema and creates the initial admin account. No operational seed rows are
 inserted.
+
+The public GitHub Pages site can call the deployed backend by setting the
+`northstar-api-base` meta tag in `index.html` to the backend's HTTPS origin
+(without a trailing slash). The backend must set `STATIC_SITE_ORIGIN` to
+`https://emailgoodluck-collab.github.io`. Until the service is deployed and
+connected, the site displays unavailable/empty states rather than invented
+operational values.
 
 ## API
 
@@ -35,6 +42,8 @@ inserted.
 | --- | --- | --- |
 | `GET /api/dashboard` | Public | Shipment/driver totals and regional allocation summary |
 | `GET /api/track/:trackingCode` | Public, rate limited | Current shipment data, checked-at time, and timestamped status/progress history |
+| `POST /api/support/conversations` | Public, rate limited | Start a support conversation and receive a private conversation token |
+| `/api/support/conversations/:id/messages` | Conversation token | Read and send messages for that conversation |
 | `POST /api/admin/session` | Public sign-in | Create an eight-hour, HTTP-only admin session |
 | `GET /api/admin/session` | Admin | Check the current session |
 | `DELETE /api/admin/session` | Admin | Sign out and revoke the session |
@@ -42,6 +51,7 @@ inserted.
 | `/api/admin/drivers` | Admin | List, create, edit, and delete driver records |
 | `/api/admin/allocations` | Admin | List, create, edit, and delete regional allocations |
 | `GET /api/admin/events` | Admin | Review the latest 100 audited admin changes |
+| `/api/admin/support/conversations` | Admin | View conversations and send staff replies |
 | `GET /health/live` | Public | Process liveness |
 | `GET /health/ready` | Public | Database connectivity/readiness |
 
@@ -60,6 +70,13 @@ seconds while its backend is connected.
 This is an operational event log, not carrier GPS telemetry: location updates
 are not available until a carrier/device feed is integrated. Records created
 before this history table exists have no invented historical scans.
+
+Support chats and messages are stored in PostgreSQL. Customers receive a
+random per-conversation token; only its hash is stored, and the token is kept
+in the browser session for the active tab. The public chat polls for replies,
+and the protected admin portal polls the inbox and supports staff responses.
+This is an inbox-based live chat, not an always-on staffed guarantee; a team
+member must be signed into the admin portal to reply.
 
 Database tables and constraints are in [`src/schema.sql`](./src/schema.sql).
 Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` only through a local
@@ -80,10 +97,6 @@ have been created by this repository change; review current plan pricing and
 confirm before applying it. GitHub Pages by itself cannot run this API or
 connect to PostgreSQL.
 
-## Demo limitations
-
-The hosted GitHub Pages URL continues to use clearly labeled fictional sample
-data until the Render app is deployed. The sample driver names, shipment
-records, counts, and allocations are not live carrier information. The database
-starts empty and becomes operational data only when an authorized admin adds
-records.
+The database starts empty and becomes operational data only when an authorized
+admin adds records. Support is unavailable until the backend is deployed and
+the public site is configured with its backend origin.

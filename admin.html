@@ -50,8 +50,23 @@
       .event { padding-bottom:10px; border-bottom:1px solid #edf2f7; color:#526b83; font-size:10px; line-height:1.5; }
       .event:last-child { border-bottom:0; }
       .event time { display:block; margin-top:3px; color:#8496a8; font-size:9px; }
+      .support-layout { display:grid; grid-template-columns:minmax(220px,.7fr) minmax(0,1.5fr); gap:16px; margin-top:14px; }
+      .support-list { display:grid; align-content:start; gap:8px; max-height:420px; overflow:auto; }
+      .support-conversation { padding:11px; border:1px solid var(--line); border-radius:9px; background:white; color:var(--ink); text-align:left; cursor:pointer; }
+      .support-conversation.selected { border-color:var(--blue); background:#f2f7fc; }
+      .support-conversation strong,.support-conversation small { display:block; }
+      .support-conversation strong { font-size:10px; }
+      .support-conversation small { margin-top:5px; color:var(--muted); font-size:9px; }
+      .support-thread { display:flex; flex-direction:column; min-height:250px; max-height:360px; gap:9px; overflow:auto; padding:12px; border:1px solid var(--line); border-radius:10px; background:#f7f9fc; }
+      .support-message { max-width:88%; padding:10px; border-radius:10px; background:white; color:var(--ink); font-size:10px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+      .support-message.admin { align-self:flex-end; background:#e5f3f4; }
+      .support-message time { display:block; margin-top:4px; color:var(--muted); font-size:8px; }
+      .support-reply { display:flex; gap:8px; margin-top:10px; }
+      .support-reply input { flex:1; min-width:0; }
+      .support-reply button { flex:0 0 auto; }
       .hidden { display:none !important; }
       @media(max-width:800px) { .grid { grid-template-columns:1fr; } }
+      @media(max-width:800px) { .support-layout { grid-template-columns:1fr; } }
       @media(max-width:540px) { .bar { align-items:flex-start; padding:13px 16px; } .bar-actions { align-items:flex-end; flex-direction:column; gap:7px; } main { margin-top:24px; } .panel { padding:15px; } .editor-grid { grid-template-columns:1fr; } .editor-grid .wide { grid-column:auto; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-left { align-items:stretch; flex-direction:column; } .toolbar select { width:100%; } }
     </style>
   </head>
@@ -112,6 +127,22 @@
             <div class="events" id="events-list"></div>
           </section>
         </div>
+        <section class="panel" aria-labelledby="support-title">
+          <h2 id="support-title">Live support inbox</h2>
+          <p class="intro">Customer messages update automatically. Replies are stored with server timestamps.</p>
+          <p class="message" id="support-admin-message" role="status" aria-live="polite"></p>
+          <div class="support-layout">
+            <div class="support-list" id="support-conversations" aria-label="Support conversations"></div>
+            <div>
+              <div class="support-thread" id="support-thread" aria-live="polite"></div>
+              <form class="support-reply" id="support-reply-form">
+                <label class="hidden" for="support-reply">Reply to selected conversation</label>
+                <input id="support-reply" maxlength="2000" placeholder="Select a conversation to reply…" required disabled>
+                <button class="button" type="submit" disabled>Reply</button>
+              </form>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
 
@@ -121,7 +152,7 @@
           title: "Shipments",
           columns: ["tracking_code", "origin", "destination", "status", "eta"],
           fields: [
-            { key: "tracking_code", label: "Tracking code", type: "text", placeholder: "EU-2147" },
+            { key: "tracking_code", label: "Tracking code", type: "text", placeholder: "Carrier-provided code" },
             { key: "origin", label: "Origin", type: "text" },
             { key: "destination", label: "Destination", type: "text" },
             { key: "mode", label: "Mode", type: "select", options: ["Road freight", "Air priority", "Regional LTL", "Sea freight", "Express"] },
@@ -165,6 +196,13 @@
       const tableBody = document.querySelector("#table-body");
       const recordsMessage = document.querySelector("#records-message");
       const eventsList = document.querySelector("#events-list");
+      const supportConversations = document.querySelector("#support-conversations");
+      const supportThread = document.querySelector("#support-thread");
+      const supportAdminMessage = document.querySelector("#support-admin-message");
+      const supportReplyForm = document.querySelector("#support-reply-form");
+      const supportReplyInput = document.querySelector("#support-reply");
+      let selectedSupportId = "";
+      let supportConversationRows = [];
       let currentRecords = [];
       let editingId = null;
 
@@ -305,11 +343,89 @@
             item.append(time);
             eventsList.append(item);
           }
+          await refreshSupportInbox();
         } catch (error) {
           recordsMessage.textContent = error.message;
           if (error.message.includes("Sign-in") || error.message.includes("Session expired")) showLogin();
         }
       }
+
+      async function refreshSupportInbox() {
+        try {
+          supportConversationRows = await api("/api/admin/support/conversations");
+          supportConversations.replaceChildren();
+          if (!supportConversationRows.length) {
+            const empty = document.createElement("p");
+            empty.className = "notice";
+            empty.textContent = "No support conversations yet.";
+            supportConversations.append(empty);
+            selectedSupportId = "";
+            supportThread.replaceChildren();
+            supportReplyInput.disabled = true;
+            supportReplyForm.querySelector("button").disabled = true;
+            return;
+          }
+          if (!supportConversationRows.some((conversation) => conversation.id === selectedSupportId)) {
+            selectedSupportId = supportConversationRows[0].id;
+          }
+          for (const conversation of supportConversationRows) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `support-conversation${conversation.id === selectedSupportId ? " selected" : ""}`;
+            const title = document.createElement("strong");
+            title.textContent = `${conversation.status.toUpperCase()} · ${conversation.id.slice(0, 8)}`;
+            const preview = document.createElement("small");
+            preview.textContent = conversation.last_message || "No messages";
+            const time = document.createElement("small");
+            time.textContent = new Date(conversation.updated_at).toLocaleString();
+            button.append(title, preview, time);
+            button.addEventListener("click", () => {
+              selectedSupportId = conversation.id;
+              void refreshSupportInbox();
+            });
+            supportConversations.append(button);
+          }
+          supportReplyInput.disabled = false;
+          supportReplyForm.querySelector("button").disabled = false;
+          const result = await api(`/api/admin/support/conversations/${encodeURIComponent(selectedSupportId)}/messages`);
+          supportThread.replaceChildren();
+          for (const message of result.messages) {
+            const item = document.createElement("article");
+            item.className = `support-message ${message.sender_kind}`;
+            item.append(document.createTextNode(message.body));
+            const time = document.createElement("time");
+            time.dateTime = message.created_at;
+            time.textContent = new Date(message.created_at).toLocaleString();
+            item.append(time);
+            supportThread.append(item);
+          }
+          supportThread.scrollTop = supportThread.scrollHeight;
+          supportAdminMessage.textContent = result.status === "closed" ? "Selected conversation is closed." : "";
+        } catch (error) {
+          supportAdminMessage.textContent = error.message;
+          if (error.message.includes("Sign-in") || error.message.includes("Session expired")) showLogin();
+        }
+      }
+
+      supportReplyForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!selectedSupportId) return;
+        supportAdminMessage.textContent = "";
+        const button = supportReplyForm.querySelector("button");
+        button.disabled = true;
+        try {
+          await api(`/api/admin/support/conversations/${encodeURIComponent(selectedSupportId)}/messages`, {
+            method: "POST",
+            body: JSON.stringify({ message: supportReplyInput.value }),
+          });
+          supportReplyInput.value = "";
+          await refreshSupportInbox();
+        } catch (error) {
+          supportAdminMessage.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
 
       async function deleteRecord(id) {
         if (!window.confirm("Permanently delete this record?")) return;
@@ -375,6 +491,10 @@
       document.querySelector("#logout-button").addEventListener("click", async () => {
         try { await api("/api/admin/session", { method: "DELETE" }); } finally { showLogin(); }
       });
+
+      window.setInterval(() => {
+        if (!adminSection.classList.contains("hidden")) void refreshSupportInbox();
+      }, 5000);
 
       api("/api/admin/session")
         .then(({ authenticated, admin }) => {

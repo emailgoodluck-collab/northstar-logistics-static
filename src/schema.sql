@@ -75,3 +75,26 @@ CREATE TABLE IF NOT EXISTS operation_events (
 );
 
 CREATE INDEX IF NOT EXISTS operation_events_occurred_at_idx ON operation_events (occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS support_conversations (
+  id TEXT PRIMARY KEY,
+  access_token_hash TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS support_conversations_updated_at_idx
+  ON support_conversations (updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS support_messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  sender_kind TEXT NOT NULL CHECK (sender_kind IN ('customer', 'admin')),
+  sender_id TEXT REFERENCES admin_users(id) ON DELETE SET NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS support_messages_conversation_idx
+  ON support_messages (conversation_id, created_at ASC);

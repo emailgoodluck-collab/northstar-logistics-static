@@ -9,7 +9,7 @@ import { validateAllocation, validateDriver, validateShipment } from "../src/val
 const ADMIN_EMAIL = "operations@example.com";
 const ADMIN_PASSWORD = "local-test-password-2026";
 const shipmentInput = {
-  tracking_code: "EU-2147",
+  tracking_code: "TEST-001",
   origin: "Athens, Greece",
   destination: "Rotterdam, Netherlands",
   mode: "Road freight",
@@ -74,7 +74,18 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
 
   const adminPage = await fetch(`${url}/admin`);
   assert.equal(adminPage.status, 200);
-  assert.match(await adminPage.text(), /Operations admin/);
+  const adminHtml = await adminPage.text();
+  assert.match(adminHtml, /Operations admin/);
+  assert.match(adminHtml, /Live support inbox/);
+
+  const publicPage = await fetch(`${url}/`);
+  assert.equal(publicPage.status, 200);
+  const publicHtml = await publicPage.text();
+  assert.match(publicHtml, /id="chat-launcher"/);
+  assert.match(publicHtml, /northstar-api-base/);
+  assert.match(publicHtml, /id="active-shipment-count">—<\/strong>/);
+  assert.match(publicHtml, /id="online-driver-count">—<\/strong>/);
+  assert.match(publicHtml, /id="allocation-list"><p class="alloc-note">Live allocations will appear when available\.<\/p>/);
 
   const publicBeforeLogin = await fetch(`${url}/api/admin/shipments`);
   assert.equal(publicBeforeLogin.status, 401);
@@ -88,6 +99,16 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
     headers: { Origin: "https://untrusted.example" },
   });
   assert.equal(deniedOrigin.status, 403);
+  const supportPreflight = await fetch(`${url}/api/support/conversations`, {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://northstar.example",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "authorization,content-type",
+    },
+  });
+  assert.equal(supportPreflight.status, 204);
+  assert.match(supportPreflight.headers.get("access-control-allow-headers"), /Authorization/);
 
   const dashboardResponse = await fetch(`${url}/api/dashboard`);
   assert.equal(dashboardResponse.status, 200);
@@ -105,7 +126,7 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   });
   assert.equal(createdShipmentResponse.status, 201);
   const shipment = await createdShipmentResponse.json();
-  assert.equal(shipment.tracking_code, "EU-2147");
+  assert.equal(shipment.tracking_code, "TEST-001");
 
   const duplicateShipment = await adminFetch("/api/admin/shipments", {
     method: "POST",
@@ -119,7 +140,7 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   });
   assert.equal(invalidShipment.status, 400);
 
-  const trackingResponse = await fetch(`${url}/api/track/eu-2147`);
+  const trackingResponse = await fetch(`${url}/api/track/test-001`);
   assert.equal(trackingResponse.status, 200);
   const initialTracking = await trackingResponse.json();
   assert.equal(initialTracking.status, "In transit");
@@ -135,7 +156,7 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   });
   assert.equal(updatedShipment.status, 200);
   assert.equal((await updatedShipment.json()).status, "Delivered");
-  const updatedTracking = await (await fetch(`${url}/api/track/EU-2147`)).json();
+  const updatedTracking = await (await fetch(`${url}/api/track/TEST-001`)).json();
   assert.equal(updatedTracking.trackingHistory.length, 2);
   assert.match(updatedTracking.trackingHistory[0].description, /In transit to Delivered/);
   assert.equal(updatedTracking.trackingHistory[0].status, "Delivered");
@@ -144,21 +165,21 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
     body: JSON.stringify({ status: "Delivered", progress: 100 }),
   });
   assert.equal(unchangedShipment.status, 200);
-  const afterUnchangedUpdate = await (await fetch(`${url}/api/track/EU-2147`)).json();
+  const afterUnchangedUpdate = await (await fetch(`${url}/api/track/TEST-001`)).json();
   assert.equal(afterUnchangedUpdate.trackingHistory.length, 2);
   const changedEta = await adminFetch(`/api/admin/shipments/${shipment.id}`, {
     method: "PATCH",
     body: JSON.stringify({ eta: "2026-10-25T12:30:00.000Z" }),
   });
   assert.equal(changedEta.status, 200);
-  const afterEtaUpdate = await (await fetch(`${url}/api/track/EU-2147`)).json();
+  const afterEtaUpdate = await (await fetch(`${url}/api/track/TEST-001`)).json();
   assert.equal(afterEtaUpdate.trackingHistory.length, 3);
   assert.match(afterEtaUpdate.trackingHistory[0].description, /ETA updated/);
 
   const createdDriver = await adminFetch("/api/admin/drivers", {
     method: "POST",
     body: JSON.stringify({
-      name: "Mila Dimas",
+      name: "Test Driver",
       region: "Athens",
       status: "Available",
       vehicle: "Euro 6 Truck",
@@ -178,6 +199,49 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   });
   assert.equal(createdAllocation.status, 201);
 
+  const newConversation = await fetch(`${url}/api/support/conversations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://northstar.example" },
+    body: JSON.stringify({ message: "Can you help with my delivery?" }),
+  });
+  assert.equal(newConversation.status, 201);
+  const conversation = await newConversation.json();
+  assert.match(conversation.accessToken, /^[a-f0-9]{64}$/);
+
+  const unauthorizedMessages = await fetch(`${url}/api/support/conversations/${conversation.conversationId}/messages`);
+  assert.equal(unauthorizedMessages.status, 401);
+
+  const customerHeaders = {
+    Authorization: `Bearer ${conversation.accessToken}`,
+    Origin: "https://northstar.example",
+  };
+  const customerMessages = await fetch(
+    `${url}/api/support/conversations/${conversation.conversationId}/messages`,
+    { headers: customerHeaders },
+  );
+  assert.equal(customerMessages.status, 200);
+  assert.equal((await customerMessages.json()).messages[0].body, "Can you help with my delivery?");
+
+  const inbox = await adminFetch("/api/admin/support/conversations");
+  assert.equal(inbox.status, 200);
+  assert.equal((await inbox.json())[0].last_message, "Can you help with my delivery?");
+
+  const reply = await adminFetch(`/api/admin/support/conversations/${conversation.conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ message: "We are checking the shipment now." }),
+  });
+  assert.equal(reply.status, 201);
+  assert.equal((await reply.json()).sender_kind, "admin");
+
+  const updatedConversation = await fetch(
+    `${url}/api/support/conversations/${conversation.conversationId}/messages`,
+    { headers: customerHeaders },
+  );
+  const updatedConversationData = await updatedConversation.json();
+  assert.equal(updatedConversationData.messages.length, 2);
+  assert.equal(updatedConversationData.messages[1].body, "We are checking the shipment now.");
+  assert.ok(Number.isFinite(Date.parse(updatedConversationData.messages[1].created_at)));
+
   const dashboard = await (await fetch(`${url}/api/dashboard`)).json();
   assert.equal(dashboard.summary.totalShipments, 1);
   assert.equal(dashboard.summary.activeShipments, 0);
@@ -185,7 +249,7 @@ test("admin APIs authenticate and persist shipments, drivers, allocations, and a
   assert.equal(dashboard.allocations[0].region, "Greece");
 
   const events = await (await adminFetch("/api/admin/events")).json();
-  assert.equal(events.length, 6);
+  assert.equal(events.length, 7);
   assert.equal(events[0].admin_email, ADMIN_EMAIL);
 
   const logout = await adminFetch("/api/admin/session", { method: "DELETE" });
